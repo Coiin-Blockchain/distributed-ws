@@ -680,7 +680,6 @@ class Worker(BaseWorker, ServerNode):
         self.low_level_profiler = low_level_profiler
 
         handlers = {
-            "gather": self.gather,
             "run": self.run,
             "run_coroutine": self.run_coroutine,
             "get_data": self.get_data,
@@ -707,6 +706,7 @@ class Worker(BaseWorker, ServerNode):
         }
 
         stream_handlers = {
+            "gather": self.gather,
             "close": self.close,
             "cancel-compute": self._handle_remote_stimulus(CancelComputeEvent),
             "acquire-replicas": self._handle_remote_stimulus(AcquireReplicasEvent),

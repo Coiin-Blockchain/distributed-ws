@@ -482,7 +482,8 @@ class Worker(BaseWorker, ServerNode):
         services: dict | None = None,
         name: Any | None = None,
         reconnect: bool | None = None,
-        executor: Executor | dict[str, Executor] | Literal["offload"] | None = None,
+        executor: Executor | dict[str,
+                                  Executor] | Literal["offload"] | None = None,
         resources: dict[str, float] | None = None,
         silence_logs: int | None = None,
         death_timeout: Any | None = None,
@@ -582,17 +583,21 @@ class Worker(BaseWorker, ServerNode):
         self.transfer_outgoing_bytes_total = 0
         self.transfer_outgoing_bytes = 0
         self.transfer_outgoing_count = 0
-        self.bandwidth = parse_bytes(dask.config.get("distributed.scheduler.bandwidth"))
+        self.bandwidth = parse_bytes(
+            dask.config.get("distributed.scheduler.bandwidth"))
         self.bandwidth_workers = defaultdict(
             lambda: (0, 0)
         )  # bw/count recent transfers
-        self.bandwidth_types = defaultdict(lambda: (0, 0))  # bw/count recent transfers
+        self.bandwidth_types = defaultdict(
+            lambda: (0, 0))  # bw/count recent transfers
         self.latency = 0.001
         self._client = None
 
         if profile_cycle_interval is None:
-            profile_cycle_interval = dask.config.get("distributed.worker.profile.cycle")
-        profile_cycle_interval = parse_timedelta(profile_cycle_interval, default="ms")
+            profile_cycle_interval = dask.config.get(
+                "distributed.worker.profile.cycle")
+        profile_cycle_interval = parse_timedelta(
+            profile_cycle_interval, default="ms")
         assert profile_cycle_interval
 
         self._setup_logging(logger)
@@ -670,7 +675,8 @@ class Worker(BaseWorker, ServerNode):
         )
 
         if low_level_profiler is None:
-            low_level_profiler = dask.config.get("distributed.worker.profile.low-level")
+            low_level_profiler = dask.config.get(
+                "distributed.worker.profile.low-level")
         self.low_level_profiler = low_level_profiler
 
         handlers = {
@@ -792,11 +798,13 @@ class Worker(BaseWorker, ServerNode):
             "worker": self,
         }
 
-        self.heartbeat_interval = parse_timedelta(heartbeat_interval, default="ms")
+        self.heartbeat_interval = parse_timedelta(
+            heartbeat_interval, default="ms")
         pc = PeriodicCallback(self.heartbeat, self.heartbeat_interval * 1000)
         self.periodic_callbacks["heartbeat"] = pc
 
-        pc = PeriodicCallback(lambda: self.batched_send({"op": "keep-alive"}), 60000)
+        pc = PeriodicCallback(lambda: self.batched_send(
+            {"op": "keep-alive"}), 60000)
         self.periodic_callbacks["keep-alive"] = pc
 
         pc = PeriodicCallback(self.find_missing, 1000)
@@ -816,10 +824,12 @@ class Worker(BaseWorker, ServerNode):
             profile_trigger_interval = parse_timedelta(
                 dask.config.get("distributed.worker.profile.interval"), default="ms"
             )
-            pc = PeriodicCallback(self.trigger_profile, profile_trigger_interval * 1000)
+            pc = PeriodicCallback(self.trigger_profile,
+                                  profile_trigger_interval * 1000)
             self.periodic_callbacks["profile"] = pc
 
-            pc = PeriodicCallback(self.cycle_profile, profile_cycle_interval * 1000)
+            pc = PeriodicCallback(self.cycle_profile,
+                                  profile_cycle_interval * 1000)
             self.periodic_callbacks["profile-cycle"] = pc
 
         if lifetime is None:
@@ -827,11 +837,13 @@ class Worker(BaseWorker, ServerNode):
         lifetime = parse_timedelta(lifetime)
 
         if lifetime_stagger is None:
-            lifetime_stagger = dask.config.get("distributed.worker.lifetime.stagger")
+            lifetime_stagger = dask.config.get(
+                "distributed.worker.lifetime.stagger")
         lifetime_stagger = parse_timedelta(lifetime_stagger)
 
         if lifetime_restart is None:
-            lifetime_restart = dask.config.get("distributed.worker.lifetime.restart")
+            lifetime_restart = dask.config.get(
+                "distributed.worker.lifetime.restart")
         self.lifetime_restart = lifetime_restart
 
         if lifetime:
@@ -882,12 +894,14 @@ class Worker(BaseWorker, ServerNode):
     actors = DeprecatedWorkerStateAttribute()
     available_resources = DeprecatedWorkerStateAttribute()
     busy_workers = DeprecatedWorkerStateAttribute()
-    comm_nbytes = DeprecatedWorkerStateAttribute(target="transfer_incoming_bytes")
+    comm_nbytes = DeprecatedWorkerStateAttribute(
+        target="transfer_incoming_bytes")
     comm_threshold_bytes = DeprecatedWorkerStateAttribute(
         target="transfer_incoming_bytes_throttle_threshold"
     )
     constrained = DeprecatedWorkerStateAttribute()
-    data_needed_per_worker = DeprecatedWorkerStateAttribute(target="data_needed")
+    data_needed_per_worker = DeprecatedWorkerStateAttribute(
+        target="data_needed")
     executed_count = DeprecatedWorkerStateAttribute()
     executing_count = DeprecatedWorkerStateAttribute()
     generation = DeprecatedWorkerStateAttribute()
@@ -895,7 +909,8 @@ class Worker(BaseWorker, ServerNode):
     incoming_count = DeprecatedWorkerStateAttribute(
         target="transfer_incoming_count_total"
     )
-    in_flight_tasks = DeprecatedWorkerStateAttribute(target="in_flight_tasks_count")
+    in_flight_tasks = DeprecatedWorkerStateAttribute(
+        target="in_flight_tasks_count")
     in_flight_workers = DeprecatedWorkerStateAttribute()
     log = DeprecatedWorkerStateAttribute()
     long_running = DeprecatedWorkerStateAttribute()
@@ -1214,13 +1229,15 @@ class Worker(BaseWorker, ServerNode):
                 self.scheduler_delay = response["time"] - middle
                 break
             except OSError:
-                logger.info("Waiting to connect to: %26s", self.scheduler.address)
+                logger.info("Waiting to connect to: %26s",
+                            self.scheduler.address)
                 await asyncio.sleep(0.1)
             except TimeoutError:  # pragma: no cover
                 logger.info("Timed out when connecting to scheduler")
         if response["status"] != "OK":
             await comm.close()
-            msg = response["message"] if "message" in response else repr(response)
+            msg = response["message"] if "message" in response else repr(
+                response)
             logger.error(f"Unable to connect to scheduler: {msg}")
             raise ValueError(f"Unexpected response from register: {response!r}")
 
@@ -1277,7 +1294,8 @@ class Worker(BaseWorker, ServerNode):
                 # remove_worker(); there can be a heartbeat between when the scheduler
                 # removes the worker on its side and when the {"op": "close"} command
                 # arrives through batched comms to the worker.
-                logger.warning("Scheduler was unaware of this worker; shutting down.")
+                logger.warning(
+                    "Scheduler was unaware of this worker; shutting down.")
                 # We close here just for safety's sake - the {op: close} should
                 # arrive soon anyway.
                 await self.close(reason="worker-heartbeat-missing")
@@ -1290,9 +1308,11 @@ class Worker(BaseWorker, ServerNode):
             self.bandwidth_workers.clear()
             self.bandwidth_types.clear()
         except OSError:
-            logger.exception("Failed to communicate with scheduler during heartbeat.")
+            logger.exception(
+                "Failed to communicate with scheduler during heartbeat.")
         except Exception:
-            logger.exception("Unexpected exception during heartbeat. Closing worker.")
+            logger.exception(
+                "Unexpected exception during heartbeat. Closing worker.")
             await self.close(reason="worker-heartbeat-error")
             raise
 
@@ -1414,7 +1434,8 @@ class Worker(BaseWorker, ServerNode):
             try:
                 import distributed.dashboard.worker
             except ImportError:
-                logger.debug("To start diagnostics web server please install Bokeh")
+                logger.debug(
+                    "To start diagnostics web server please install Bokeh")
             else:
                 distributed.dashboard.worker.connect(
                     self.http_application,
@@ -1435,7 +1456,8 @@ class Worker(BaseWorker, ServerNode):
         self.start_services(self.ip)
 
         try:
-            listening_address = "%s%s:%d" % (self.listener.prefix, self.ip, self.port)
+            listening_address = "%s%s:%d" % (
+                self.listener.prefix, self.ip, self.port)
         except Exception:
             listening_address = f"{self.listener.prefix}{self.ip}"
 
@@ -1465,7 +1487,8 @@ class Worker(BaseWorker, ServerNode):
             ),
             return_exceptions=True,
         )
-        plugins_exceptions = [msg for msg in plugins_msgs if isinstance(msg, Exception)]
+        plugins_exceptions = [
+            msg for msg in plugins_msgs if isinstance(msg, Exception)]
         if len(plugins_exceptions) >= 1:
             if len(plugins_exceptions) > 1:
                 logger.error(
@@ -1537,13 +1560,15 @@ class Worker(BaseWorker, ServerNode):
         disable_gc_diagnosis()
 
         try:
-            self.log_event(self.address, {"action": "closing-worker", "reason": reason})
+            self.log_event(
+                self.address, {"action": "closing-worker", "reason": reason})
         except Exception:
             # This can happen when the Server is not up yet
             logger.exception("Failed to log closing event")
 
         try:
-            logger.info("Stopping worker at %s. Reason: %s", self.address, reason)
+            logger.info("Stopping worker at %s. Reason: %s",
+                        self.address, reason)
         except ValueError:  # address not available if already closed
             logger.info("Stopping worker. Reason: %s", reason)
         if self.status not in WORKER_ANY_RUNNING:
@@ -1677,7 +1702,8 @@ class Worker(BaseWorker, ServerNode):
         if self.status == Status.closed:
             return
 
-        logger.info("Closing worker gracefully: %s. Reason: %s", self.address, reason)
+        logger.info("Closing worker gracefully: %s. Reason: %s",
+                    self.address, reason)
         # Wait for all tasks to leave the worker and don't accept any new ones.
         # Scheduler.retire_workers will set the status to closing_gracefully and push it
         # back to this worker.
@@ -1769,7 +1795,8 @@ class Worker(BaseWorker, ServerNode):
                         type(self.state.actors[k]), self.address, k, worker=self
                     )
 
-        msg = {"status": "OK", "data": {k: to_serialize(v) for k, v in data.items()}}
+        msg = {"status": "OK", "data": {
+            k: to_serialize(v) for k, v in data.items()}}
         # Note: `if k in self.data` above guarantees that
         # k is in self.state.tasks too and that nbytes is non-None
         bytes_per_task = {k: self.state.tasks[k].nbytes or 0 for k in data}
@@ -1824,7 +1851,8 @@ class Worker(BaseWorker, ServerNode):
     ) -> dict[str, Any]:
         if stimulus_id is None:
             stimulus_id = f"update-data-{time()}"
-        self.handle_stimulus(UpdateDataEvent(data=data, stimulus_id=stimulus_id))
+        self.handle_stimulus(UpdateDataEvent(
+            data=data, stimulus_id=stimulus_id))
         return {"nbytes": {k: sizeof(v) for k, v in data.items()}, "status": "OK"}
 
     async def set_resources(self, **resources: float) -> None:
@@ -2051,7 +2079,8 @@ class Worker(BaseWorker, ServerNode):
                 stimulus_id=f"worker-closing-{time()}",
             )
 
-        self.state.log.append(("request-dep", worker, to_gather, stimulus_id, time()))
+        self.state.log.append(
+            ("request-dep", worker, to_gather, stimulus_id, time()))
         logger.debug("Request %d keys from %s", len(to_gather), worker)
 
         try:
@@ -2080,7 +2109,8 @@ class Worker(BaseWorker, ServerNode):
                 worker=worker,
             )
             self.state.log.append(
-                ("receive-dep", worker, set(response["data"]), stimulus_id, time())
+                ("receive-dep", worker,
+                 set(response["data"]), stimulus_id, time())
             )
             return GatherDepSuccessEvent(
                 worker=worker,
@@ -2089,7 +2119,8 @@ class Worker(BaseWorker, ServerNode):
                 stimulus_id=f"gather-dep-success-{time()}",
             )
         except OSError:
-            logger.exception("Worker stream died during communication: %s", worker)
+            logger.exception(
+                "Worker stream died during communication: %s", worker)
             self.state.log.append(
                 ("gather-dep-failed", worker, to_gather, stimulus_id, time())
             )
@@ -2139,7 +2170,8 @@ class Worker(BaseWorker, ServerNode):
 
     @log_errors
     def find_missing(self) -> None:
-        self.handle_stimulus(FindMissingEvent(stimulus_id=f"find-missing-{time()}"))
+        self.handle_stimulus(FindMissingEvent(
+            stimulus_id=f"find-missing-{time()}"))
 
         # This is quite arbitrary but the heartbeat has scaling implemented
         self.periodic_callbacks["find-missing"].callback_time = self.periodic_callbacks[
@@ -2394,12 +2426,14 @@ class Worker(BaseWorker, ServerNode):
             except KeyError:
                 from distributed.actor import Actor  # TODO: create local actor
 
-                data[k] = Actor(type(self.state.actors[k]), self.address, k, self)
+                data[k] = Actor(type(self.state.actors[k]),
+                                self.address, k, self)
         args2 = pack_data(args, data, key_types=(bytes, str, tuple))
         kwargs2 = pack_data(kwargs, data, key_types=(bytes, str, tuple))
         stop = time()
         if stop - start > 0.005:
-            ts.startstops.append({"action": "disk-read", "start": start, "stop": stop})
+            ts.startstops.append(
+                {"action": "disk-read", "start": start, "stop": stop})
 
         return args2, kwargs2
 
@@ -2429,7 +2463,8 @@ class Worker(BaseWorker, ServerNode):
         frames = {ident: frames[ident] for ident in active_threads}
         llframes = {}
         if self.low_level_profiler:
-            llframes = {ident: profile.ll_get_stack(ident) for ident in active_threads}
+            llframes = {ident: profile.ll_get_stack(
+                ident) for ident in active_threads}
         for ident, frame in frames.items():
             if frame is not None:
                 key = key_split(active_threads[ident])
@@ -2459,7 +2494,8 @@ class Worker(BaseWorker, ServerNode):
         elif key is None:
             history = self.profile_history
         else:
-            history = [(t, d[key]) for t, d in self.profile_keys_history if key in d]
+            history = [(t, d[key])
+                       for t, d in self.profile_keys_history if key in d]
 
         if start is None:
             istart = 0
@@ -2519,7 +2555,8 @@ class Worker(BaseWorker, ServerNode):
     def get_call_stack(self, keys: Collection[Key] | None = None) -> dict[Key, Any]:
         with self.active_threads_lock:
             sys_frames = sys._current_frames()
-            frames = {key: sys_frames[tid] for tid, key in self.active_threads.items()}
+            frames = {key: sys_frames[tid]
+                      for tid, key in self.active_threads.items()}
         if keys is not None:
             frames = {key: frames[key] for key in keys if key in frames}
 
@@ -2631,7 +2668,8 @@ class Worker(BaseWorker, ServerNode):
 
     def _handle_remove_worker(self, worker: str, stimulus_id: str) -> None:
         self.rpc.remove(worker)
-        self.handle_stimulus(RemoveWorkerEvent(worker=worker, stimulus_id=stimulus_id))
+        self.handle_stimulus(RemoveWorkerEvent(
+            worker=worker, stimulus_id=stimulus_id))
 
     def validate_state(self) -> None:
         try:
@@ -2701,7 +2739,8 @@ class Worker(BaseWorker, ServerNode):
         return self.transfer_outgoing_count_limit
 
 
-_worker_cvar: contextvars.ContextVar[Worker] = contextvars.ContextVar("_worker_cvar")
+_worker_cvar: contextvars.ContextVar[Worker] = contextvars.ContextVar(
+    "_worker_cvar")
 
 
 def get_worker() -> Worker:
@@ -3184,7 +3223,8 @@ async def run(server, comm, function, args=(), kwargs=None, wait=True):
             if wait:
                 result = await function(*args, **kwargs)
             else:
-                server._ongoing_background_tasks.call_soon(function, *args, **kwargs)
+                server._ongoing_background_tasks.call_soon(
+                    function, *args, **kwargs)
                 result = None
 
     except Exception as e:
@@ -3456,7 +3496,8 @@ def benchmark_memory(
 async def benchmark_network(
     address: str,
     rpc: ConnectionPool | Callable[[str], RPCType],
-    sizes: Iterable[str] = ("1 kiB", "10 kiB", "100 kiB", "1 MiB", "10 MiB", "50 MiB"),
+    sizes: Iterable[str] = ("1 kiB", "10 kiB", "100 kiB",
+                            "1 MiB", "10 MiB", "50 MiB"),
     duration="1 s",
 ) -> dict[str, float]:
     """

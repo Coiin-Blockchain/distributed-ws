@@ -157,7 +157,8 @@ TaskStateState: TypeAlias = Literal[
     "forgotten",
 ]
 
-ALL_TASK_STATES: Set[TaskStateState] = set(TaskStateState.__args__)  # type: ignore
+ALL_TASK_STATES: Set[TaskStateState] = set(
+    TaskStateState.__args__)  # type: ignore
 
 # {task key -> finish state}
 # Not to be confused with distributed.worker_state_machine.Recs
@@ -371,12 +372,14 @@ class MemoryState:
 
     @property
     def managed_in_memory(self) -> int:
-        warnings.warn("managed_in_memory has been renamed to managed", FutureWarning)
+        warnings.warn(
+            "managed_in_memory has been renamed to managed", FutureWarning)
         return self.managed
 
     @property
     def managed_spilled(self) -> int:
-        warnings.warn("managed_spilled has been renamed to spilled", FutureWarning)
+        warnings.warn(
+            "managed_spilled has been renamed to spilled", FutureWarning)
         return self.spilled
 
     def __repr__(self) -> str:
@@ -549,7 +552,8 @@ class WorkerState:
         self.metrics = {}
         self.last_seen = time()
         self.time_delay = 0
-        self.bandwidth = parse_bytes(dask.config.get("distributed.scheduler.bandwidth"))
+        self.bandwidth = parse_bytes(
+            dask.config.get("distributed.scheduler.bandwidth"))
         self.actors = set()
         self._has_what = {}
         self.processing = set()
@@ -645,7 +649,8 @@ class WorkerState:
         """
         return MemoryState(
             process=self.metrics["memory"],
-            managed=max(0, self.nbytes - self.metrics["spilled_bytes"]["memory"]),
+            managed=max(0, self.nbytes -
+                        self.metrics["spilled_bytes"]["memory"]),
             spilled=self.metrics["spilled_bytes"]["disk"],
             unmanaged_old=self._memory_unmanaged_old,
         )
@@ -962,7 +967,8 @@ class TaskPrefix:
         self.groups = []
         self.all_durations = defaultdict(float)
         self.state_counts = defaultdict(int)
-        task_durations = dask.config.get("distributed.scheduler.default-task-durations")
+        task_durations = dask.config.get(
+            "distributed.scheduler.default-task-durations")
         if self.name in task_durations:
             self.duration_average = parse_timedelta(task_durations[self.name])
         else:
@@ -1710,7 +1716,8 @@ class SchedulerState:
     ):
         logger.info("State start")
         self.aliases = aliases
-        self.bandwidth = parse_bytes(dask.config.get("distributed.scheduler.bandwidth"))
+        self.bandwidth = parse_bytes(
+            dask.config.get("distributed.scheduler.bandwidth"))
         self.clients = clients
         self.clients["fire-and-forget"] = ClientState("fire-and-forget")
         self.extensions = {}
@@ -1725,10 +1732,12 @@ class SchedulerState:
             ts for ts in self.tasks.values() if len(ts.who_has or ()) > 1
         }
         self.computations = deque(
-            maxlen=dask.config.get("distributed.diagnostics.computations.max-history")
+            maxlen=dask.config.get(
+                "distributed.diagnostics.computations.max-history")
         )
         self.erred_tasks = deque(
-            maxlen=dask.config.get("distributed.diagnostics.erred-tasks.max-history")
+            maxlen=dask.config.get(
+                "distributed.diagnostics.erred-tasks.max-history")
         )
         self.task_groups = {}
         self.task_prefixes = {}
@@ -1745,7 +1754,8 @@ class SchedulerState:
         self.running = {
             ws for ws in self.workers.values() if ws.status == Status.running
         }
-        self.plugins = {} if not plugins else {_get_plugin_name(p): p for p in plugins}
+        self.plugins = {} if not plugins else {
+            _get_plugin_name(p): p for p in plugins}
 
         self.transition_log = deque(
             maxlen=dask.config.get("distributed.admin.low-level-log-length")
@@ -1771,7 +1781,8 @@ class SchedulerState:
             "distributed.worker.memory.rebalance.recipient-max"
         )
         self.MEMORY_REBALANCE_HALF_GAP = (
-            dask.config.get("distributed.worker.memory.rebalance.sender-recipient-gap")
+            dask.config.get(
+                "distributed.worker.memory.rebalance.sender-recipient-gap")
             / 2.0
         )
 
@@ -2023,7 +2034,8 @@ class SchedulerState:
                             key, start, actual_finish, stimulus_id=stimulus_id, **kwargs
                         )
                     except Exception:
-                        logger.info("Plugin failed with exception", exc_info=True)
+                        logger.info("Plugin failed with exception",
+                                    exc_info=True)
                 if ts.state == "forgotten":
                     del self.tasks[ts.key]
 
@@ -2036,7 +2048,8 @@ class SchedulerState:
 
             return recommendations, client_msgs, worker_msgs
         except Exception:
-            logger.exception("Error transitioning %r from %r to %r", key, start, finish)
+            logger.exception(
+                "Error transitioning %r from %r to %r", key, start, finish)
             if LOG_PDB:
                 import pdb
 
@@ -2062,7 +2075,8 @@ class SchedulerState:
             key, finish = recommendations.popitem()
             keys.add(key)
 
-            new_recs, new_cmsgs, new_wmsgs = self._transition(key, finish, stimulus_id)
+            new_recs, new_cmsgs, new_wmsgs = self._transition(
+                key, finish, stimulus_id)
 
             recommendations.update(new_recs)
             for c, new_msgs in new_cmsgs.items():
@@ -3581,10 +3595,12 @@ class Scheduler(SchedulerState, ServerNode):
 
         # Attributes
         if contact_address is None:
-            contact_address = dask.config.get("distributed.scheduler.contact-address")
+            contact_address = dask.config.get(
+                "distributed.scheduler.contact-address")
         self.contact_address = contact_address
         if allowed_failures is None:
-            allowed_failures = dask.config.get("distributed.scheduler.allowed-failures")
+            allowed_failures = dask.config.get(
+                "distributed.scheduler.allowed-failures")
         self.allowed_failures = allowed_failures
         if validate is None:
             validate = dask.config.get("distributed.scheduler.validate")
@@ -3602,7 +3618,8 @@ class Scheduler(SchedulerState, ServerNode):
             worker_ttl or dask.config.get("distributed.scheduler.worker-ttl")
         )
         self.idle_timeout = parse_timedelta(
-            idle_timeout or dask.config.get("distributed.scheduler.idle-timeout")
+            idle_timeout or dask.config.get(
+                "distributed.scheduler.idle-timeout")
         )
         self.idle_since = time()
         self.no_workers_timeout = parse_timedelta(
@@ -3642,7 +3659,8 @@ class Scheduler(SchedulerState, ServerNode):
             default_port=self.default_port,
         )
 
-        http_server_modules = dask.config.get("distributed.scheduler.http.routes")
+        http_server_modules = dask.config.get(
+            "distributed.scheduler.http.routes")
         show_dashboard = dashboard or (dashboard is None and dashboard_address)
         # install vanilla route if show_dashboard but bokeh is not installed
         if show_dashboard:
@@ -3650,7 +3668,8 @@ class Scheduler(SchedulerState, ServerNode):
                 import distributed.dashboard.scheduler
             except ImportError:
                 show_dashboard = False
-                http_server_modules.append("distributed.http.scheduler.missing_bokeh")
+                http_server_modules.append(
+                    "distributed.http.scheduler.missing_bokeh")
         routes = get_handlers(
             server=self, modules=http_server_modules, prefix=http_prefix
         )
@@ -4143,7 +4162,8 @@ class Scheduler(SchedulerState, ServerNode):
         )
 
         self.status = Status.closing
-        logger.info("Scheduler closing due to %s...", reason or "unknown reason")
+        logger.info("Scheduler closing due to %s...",
+                    reason or "unknown reason")
         setproctitle("dask scheduler [closing]")
 
         await self.preloads.teardown()
@@ -4212,7 +4232,8 @@ class Scheduler(SchedulerState, ServerNode):
         address = normalize_address(address)
         ws = self.workers.get(address)
         if ws is None:
-            logger.warning(f"Received heartbeat from unregistered worker {address!r}.")
+            logger.warning(
+                f"Received heartbeat from unregistered worker {address!r}.")
             return {"status": "missing"}
 
         host = get_address_host(address)
@@ -4273,7 +4294,8 @@ class Scheduler(SchedulerState, ServerNode):
         # ws._nbytes is updated at a different time and sizeof() may not be accurate,
         # so size may be (temporarily) negative; floor it to zero.
         size = max(
-            0, metrics["memory"] - ws.nbytes + metrics["spilled_bytes"]["memory"]
+            0, metrics["memory"] - ws.nbytes +
+            metrics["spilled_bytes"]["memory"]
         )
 
         ws._memory_unmanaged_history.append((local_now, size))
@@ -4282,7 +4304,8 @@ class Scheduler(SchedulerState, ServerNode):
             # because too old.
             # Note: this algorithm is capped to 200 * MEMORY_RECENT_TO_OLD_TIME elements
             # cluster-wide by heartbeat_interval(), regardless of the number of workers
-            ws._memory_unmanaged_old = min(map(second, ws._memory_unmanaged_history))
+            ws._memory_unmanaged_old = min(
+                map(second, ws._memory_unmanaged_history))
         elif size < memory_unmanaged_old:
             ws._memory_unmanaged_old = size
 
@@ -4340,7 +4363,8 @@ class Scheduler(SchedulerState, ServerNode):
             raise ValueError("Worker already exists %s" % address)
 
         if name in self.aliases:
-            logger.warning("Worker tried to connect with a duplicate name: %s", name)
+            logger.warning(
+                "Worker tried to connect with a duplicate name: %s", name)
             msg = {
                 "status": "error",
                 "message": "name taken, %s" % name,
@@ -4411,13 +4435,15 @@ class Scheduler(SchedulerState, ServerNode):
                 logger.exception(e)
 
         plugin_msgs = await asyncio.gather(*awaitables, return_exceptions=True)
-        plugins_exceptions = [msg for msg in plugin_msgs if isinstance(msg, Exception)]
+        plugins_exceptions = [
+            msg for msg in plugin_msgs if isinstance(msg, Exception)]
         for exc in plugins_exceptions:
             logger.exception(exc, exc_info=exc)
 
         if ws.status == Status.running:
             self.transitions(
-                self.bulk_schedule_unrunnable_after_adding_worker(ws), stimulus_id
+                self.bulk_schedule_unrunnable_after_adding_worker(
+                    ws), stimulus_id
             )
             self.stimulus_queue_slots_maybe_opened(stimulus_id=stimulus_id)
 
@@ -4472,7 +4498,8 @@ class Scheduler(SchedulerState, ServerNode):
                     dep not in self.tasks and dep not in dsk for dep in deps
                 ):  # bad key
                     lost_keys.add(k)
-                    logger.info("User asked for computation on lost data, %s", k)
+                    logger.info(
+                        "User asked for computation on lost data, %s", k)
                     del dsk[k]
                     del dependencies[k]
                     if k in keys:
@@ -4499,7 +4526,8 @@ class Scheduler(SchedulerState, ServerNode):
                     if dep in dependents:
                         child_deps = dependents[dep]
                     elif dep in self.tasks:
-                        child_deps = {ts.key for ts in self.tasks[key].dependencies}
+                        child_deps = {
+                            ts.key for ts in self.tasks[key].dependencies}
                     else:
                         child_deps = set()
                     if all(d in done for d in child_deps):
@@ -4548,7 +4576,8 @@ class Scheduler(SchedulerState, ServerNode):
             )
 
         if lost_keys:
-            self.report({"op": "cancelled-keys", "keys": lost_keys}, client=client)
+            self.report({"op": "cancelled-keys",
+                        "keys": lost_keys}, client=client)
             self.client_releases_keys(
                 keys=lost_keys, client=client, stimulus_id=stimulus_id
             )
@@ -4619,7 +4648,8 @@ class Scheduler(SchedulerState, ServerNode):
                     recommendations[ts.key] = "erred"
                     break
 
-        annotations_for_plugin: defaultdict[str, dict[Key, Any]] = defaultdict(dict)
+        annotations_for_plugin: defaultdict[str,
+                                            dict[Key, Any]] = defaultdict(dict)
         for key in keys_with_annotations:
             ts = self.tasks[key]
             if ts.annotations:
@@ -4769,7 +4799,8 @@ class Scheduler(SchedulerState, ServerNode):
                 continue
             ts = self.tasks.get(k)
             if ts is None:
-                ts = self.new_task(k, dsk.get(k), "released", computation=computation)
+                ts = self.new_task(k, dsk.get(k), "released",
+                                   computation=computation)
                 new_tasks.append(ts)
             # It is possible to create the TaskState object before its runspec is known
             # to the scheduler. For instance, this is possible when using a Variable:
@@ -5141,7 +5172,8 @@ class Scheduler(SchedulerState, ServerNode):
             key = stack.pop()
             seen.add(key)
             ts = self.tasks[key]
-            erred_deps = [dts.key for dts in ts.dependencies if dts.state == "erred"]
+            erred_deps = [
+                dts.key for dts in ts.dependencies if dts.state == "erred"]
             if erred_deps:
                 stack.extend(erred_deps)
             else:
@@ -5173,7 +5205,8 @@ class Scheduler(SchedulerState, ServerNode):
 
         logger.info("Closing worker %s", worker)
         self.log_event(worker, {"action": "close-worker"})
-        self.worker_send(worker, {"op": "close", "reason": "scheduler-close-worker"})
+        self.worker_send(
+            worker, {"op": "close", "reason": "scheduler-close-worker"})
 
     @log_errors
     async def remove_worker(
@@ -5309,12 +5342,14 @@ class Scheduler(SchedulerState, ServerNode):
                         scheduler=self, worker=address, stimulus_id=stimulus_id
                     )
                 except TypeError:
-                    parameters = inspect.signature(plugin.remove_worker).parameters
+                    parameters = inspect.signature(
+                        plugin.remove_worker).parameters
                     if "stimulus_id" not in parameters and not any(
                         p.kind is p.VAR_KEYWORD for p in parameters.values()
                     ):
                         # Deprecated (see add_plugin)
-                        result = plugin.remove_worker(scheduler=self, worker=address)  # type: ignore
+                        result = plugin.remove_worker(
+                            scheduler=self, worker=address)  # type: ignore
                     else:
                         raise
                 if inspect.isawaitable(result):
@@ -5323,7 +5358,8 @@ class Scheduler(SchedulerState, ServerNode):
                 logger.exception(e)
 
         plugin_msgs = await asyncio.gather(*awaitables, return_exceptions=True)
-        plugins_exceptions = [msg for msg in plugin_msgs if isinstance(msg, Exception)]
+        plugins_exceptions = [
+            msg for msg in plugin_msgs if isinstance(msg, Exception)]
         for exc in plugins_exceptions:
             logger.exception(exc, exc_info=exc)
 
@@ -5365,7 +5401,8 @@ class Scheduler(SchedulerState, ServerNode):
     ) -> None:
         """Stop execution on a list of keys"""
         logger.info("Client %s requests to cancel %d keys", client, len(keys))
-        self.log_event(client, {"action": "cancel", "count": len(keys), "force": force})
+        self.log_event(client, {"action": "cancel",
+                       "count": len(keys), "force": force})
         cs = self.clients.get(client)
         if not cs:
             return
@@ -5423,7 +5460,8 @@ class Scheduler(SchedulerState, ServerNode):
         cs = self.clients[client]
         recommendations: Recs = {}
 
-        self._client_releases_keys(keys=keys, cs=cs, recommendations=recommendations)
+        self._client_releases_keys(
+            keys=keys, cs=cs, recommendations=recommendations)
         self.transitions(recommendations, stimulus_id)
 
         self.stimulus_queue_slots_maybe_opened(stimulus_id=stimulus_id)
@@ -5525,7 +5563,8 @@ class Scheduler(SchedulerState, ServerNode):
             else:
                 ts.validate()
                 try:
-                    func = getattr(self, "validate_" + ts.state.replace("-", "_"))
+                    func = getattr(self, "validate_" +
+                                   ts.state.replace("-", "_"))
                 except AttributeError:
                     logger.error(
                         "self.validate_%s not found", ts.state.replace("-", "_")
@@ -5605,7 +5644,8 @@ class Scheduler(SchedulerState, ServerNode):
         for k, ts in self.tasks.items():
             assert isinstance(ts, TaskState), (type(ts), ts)
             assert ts.key == k
-            assert bool(ts in self.replicated_tasks) == (len(ts.who_has or ()) > 1)
+            assert bool(ts in self.replicated_tasks) == (
+                len(ts.who_has or ()) > 1)
             self.validate_key(k, ts)
 
         for ts in self.replicated_tasks:
@@ -5684,7 +5724,8 @@ class Scheduler(SchedulerState, ServerNode):
         assert client is not None
         comm.name = "Scheduler->Client"
         logger.info("Receive client connection: %s", client)
-        self.log_event(["all", client], {"action": "add-client", "client": client})
+        self.log_event(["all", client], {
+                       "action": "add-client", "client": client})
         self.clients[client] = ClientState(client, versions=versions)
 
         for plugin in list(self.plugins.values()):
@@ -5709,7 +5750,8 @@ class Scheduler(SchedulerState, ServerNode):
             try:
                 await self.handle_stream(comm=comm, extra={"client": client})
             finally:
-                self.remove_client(client=client, stimulus_id=f"remove-client-{time()}")
+                self.remove_client(
+                    client=client, stimulus_id=f"remove-client-{time()}")
                 logger.debug("Finished handling client %s", client)
         finally:
             if not comm.closed():
@@ -5728,7 +5770,8 @@ class Scheduler(SchedulerState, ServerNode):
         stimulus_id = stimulus_id or f"remove-client-{time()}"
         if self.status == Status.running:
             logger.info("Remove client %s", client)
-        self.log_event(["all", client], {"action": "remove-client", "client": client})
+        self.log_event(["all", client], {
+                       "action": "remove-client", "client": client})
         try:
             cs: ClientState = self.clients[client]
         except KeyError:
@@ -5790,15 +5833,18 @@ class Scheduler(SchedulerState, ServerNode):
             key=key, worker=worker, stimulus_id=stimulus_id, **msg
         )
         recommendations, client_msgs, worker_msgs = r
-        self._transitions(recommendations, client_msgs, worker_msgs, stimulus_id)
+        self._transitions(recommendations, client_msgs,
+                          worker_msgs, stimulus_id)
         self.send_all(client_msgs, worker_msgs)
 
         self.stimulus_queue_slots_maybe_opened(stimulus_id=stimulus_id)
 
     def handle_task_erred(self, key: Key, stimulus_id: str, **msg: Any) -> None:
-        r: tuple = self.stimulus_task_erred(key=key, stimulus_id=stimulus_id, **msg)
+        r: tuple = self.stimulus_task_erred(
+            key=key, stimulus_id=stimulus_id, **msg)
         recommendations, client_msgs, worker_msgs = r
-        self._transitions(recommendations, client_msgs, worker_msgs, stimulus_id)
+        self._transitions(recommendations, client_msgs,
+                          worker_msgs, stimulus_id)
         self.send_all(client_msgs, worker_msgs)
 
         self.stimulus_queue_slots_maybe_opened(stimulus_id=stimulus_id)
@@ -5822,7 +5868,8 @@ class Scheduler(SchedulerState, ServerNode):
         duration accounting as if the task has stopped.
         """
         if key not in self.tasks:
-            logger.debug("Skipping long_running since key %s was already released", key)
+            logger.debug(
+                "Skipping long_running since key %s was already released", key)
             return
         ts = self.tasks[key]
         steal = self.extensions.get("stealing")
@@ -5831,7 +5878,8 @@ class Scheduler(SchedulerState, ServerNode):
 
         ws = ts.processing_on
         if ws is None:
-            logger.debug("Received long-running signal from duplicate task. Ignoring.")
+            logger.debug(
+                "Received long-running signal from duplicate task. Ignoring.")
             return
 
         if compute_duration is not None:
@@ -5839,7 +5887,8 @@ class Scheduler(SchedulerState, ServerNode):
             if old_duration < 0:
                 ts.prefix.duration_average = compute_duration
             else:
-                ts.prefix.duration_average = (old_duration + compute_duration) / 2
+                ts.prefix.duration_average = (
+                    old_duration + compute_duration) / 2
 
         ws.add_to_long_running(ts)
         self.check_idle_saturated(ws)
@@ -5872,7 +5921,8 @@ class Scheduler(SchedulerState, ServerNode):
             self.running.add(ws)
             self.check_idle_saturated(ws)
             self.transitions(
-                self.bulk_schedule_unrunnable_after_adding_worker(ws), stimulus_id
+                self.bulk_schedule_unrunnable_after_adding_worker(
+                    ws), stimulus_id
             )
             self.stimulus_queue_slots_maybe_opened(stimulus_id=stimulus_id)
         else:
@@ -5892,7 +5942,8 @@ class Scheduler(SchedulerState, ServerNode):
         free_keys = []
         for key in keys:
             if key in self.tasks:
-                who_has[key] = [ws.address for ws in self.tasks[key].who_has or ()]
+                who_has[key] = [
+                    ws.address for ws in self.tasks[key].who_has or ()]
             else:
                 free_keys.append(key)
 
@@ -6141,7 +6192,8 @@ class Scheduler(SchedulerState, ServerNode):
             await self.replicate(keys=keys, workers=workers, n=n)
 
         self.log_event(
-            [client, "all"], {"action": "scatter", "client": client, "count": len(data)}
+            [client, "all"], {"action": "scatter",
+                              "client": client, "count": len(data)}
         )
         return keys
 
@@ -6211,7 +6263,8 @@ class Scheduler(SchedulerState, ServerNode):
         Client.restart_workers
         Scheduler.restart_workers
         """
-        logger.info(f"Restarting workers and releasing all keys ({stimulus_id=})")
+        logger.info(
+            f"Restarting workers and releasing all keys ({stimulus_id=})")
         for cs in self.clients.values():
             self.client_releases_keys(
                 keys=[ts.key for ts in cs.wants_what],
@@ -6291,7 +6344,8 @@ class Scheduler(SchedulerState, ServerNode):
             logger.info(f"Restarting all workers ({stimulus_id=}")
         else:
             workers = list(set(workers).intersection(self.workers))
-            logger.info(f"Restarting {len(workers)} workers: {workers} ({stimulus_id=}")
+            logger.info(
+                f"Restarting {len(workers)} workers: {workers} ({stimulus_id=}")
 
         nanny_workers = {
             addr: self.workers[addr].nanny
@@ -6300,7 +6354,8 @@ class Scheduler(SchedulerState, ServerNode):
         }
         # Close non-Nanny workers. We have no way to restart them, so we just let them
         # go, and assume a deployment system is going to restart them for us.
-        no_nanny_workers = [addr for addr in workers if addr not in nanny_workers]
+        no_nanny_workers = [
+            addr for addr in workers if addr not in nanny_workers]
         if no_nanny_workers:
             logger.warning(
                 f"Workers {no_nanny_workers} do not use a nanny and will be terminated "
@@ -6375,9 +6430,11 @@ class Scheduler(SchedulerState, ServerNode):
                     )
 
         if client:
-            self.log_event(client, {"action": "restart-workers", "workers": workers})
+            self.log_event(
+                client, {"action": "restart-workers", "workers": workers})
         self.log_event(
-            "all", {"action": "restart-workers", "workers": workers, "client": client}
+            "all", {"action": "restart-workers",
+                    "workers": workers, "client": client}
         )
 
         if not wait_for_workers:
@@ -6430,7 +6487,8 @@ class Scheduler(SchedulerState, ServerNode):
         hosts: Collection[str] | None = None,
         nanny: bool = False,
         serializers: Any = None,
-        on_error: Literal["raise", "return", "return_pickle", "ignore"] = "raise",
+        on_error: Literal["raise", "return",
+                          "return_pickle", "ignore"] = "raise",
     ) -> dict[str, Any]:
         """Broadcast message to workers, return all results"""
         if workers is None:
@@ -6447,7 +6505,8 @@ class Scheduler(SchedulerState, ServerNode):
                     workers.extend(dh["addresses"])
 
         if nanny:
-            addresses = [n for w in workers if (n := self.workers[w].nanny) is not None]
+            addresses = [n for w in workers if (
+                n := self.workers[w].nanny) is not None]
         else:
             addresses = workers
 
@@ -6465,7 +6524,8 @@ class Scheduler(SchedulerState, ServerNode):
                     self.rpc.reuse(addr, comm)
                 return resp
             except Exception as e:
-                logger.error(f"broadcast to {addr} failed: {e.__class__.__name__}: {e}")
+                logger.error(
+                    f"broadcast to {addr} failed: {e.__class__.__name__}: {e}")
                 if on_error == "raise":
                     raise
                 elif on_error == "return":
@@ -6538,7 +6598,8 @@ class Scheduler(SchedulerState, ServerNode):
                 f"Worker {worker_address} failed to acquire keys: {result['keys']}"
             )
         else:  # pragma: nocover
-            raise ValueError(f"Unexpected message from {worker_address}: {result}")
+            raise ValueError(
+                f"Unexpected message from {worker_address}: {result}")
 
         for key in keys_ok:
             ts = self.tasks.get(key)
@@ -6589,7 +6650,8 @@ class Scheduler(SchedulerState, ServerNode):
                     # Last copy deleted
                     self.transitions({key: "released"}, stimulus_id)
 
-        self.log_event(ws.address, {"action": "remove-worker-data", "keys": keys})
+        self.log_event(
+            ws.address, {"action": "remove-worker-data", "keys": keys})
 
     @log_errors
     async def rebalance(
@@ -6745,7 +6807,8 @@ class Scheduler(SchedulerState, ServerNode):
         #   Note that this iterator will typically *not* be exhausted. It will only be
         #   exhausted if, after moving away from the worker all keys that can be moved,
         #   is insufficient to drop snd_bytes_min above 0.
-        senders: list[tuple[int, int, int, WorkerState, Iterator[TaskState]]] = []
+        senders: list[tuple[int, int, int,
+                            WorkerState, Iterator[TaskState]]] = []
         recipients: list[tuple[int, int, int, WorkerState]] = []
 
         # Output: [(sender, recipient, task), ...]
@@ -6758,7 +6821,8 @@ class Scheduler(SchedulerState, ServerNode):
         memory_by_worker = [
             (ws, getattr(ws.memory, self.MEMORY_REBALANCE_MEASURE)) for ws in workers
         ]
-        mean_memory = sum(m for _, m in memory_by_worker) // len(memory_by_worker)
+        mean_memory = sum(
+            m for _, m in memory_by_worker) // len(memory_by_worker)
 
         for ws, ws_memory in memory_by_worker:
             if ws.memory_limit:
@@ -7151,13 +7215,16 @@ class Scheduler(SchedulerState, ServerNode):
         # other tasks. We should never shut down the worker they're
         # running on, as it would cause them to restart from scratch
         # somewhere else.
-        valid_workers = [ws for ws in self.workers.values() if not ws.long_running]
+        valid_workers = [ws for ws in self.workers.values()
+                         if not ws.long_running]
         for plugin in list(self.plugins.values()):
-            valid_workers = plugin.valid_workers_downscaling(self, valid_workers)
+            valid_workers = plugin.valid_workers_downscaling(
+                self, valid_workers)
 
         groups = groupby(key, valid_workers)
 
-        limit_bytes = {k: sum(ws.memory_limit for ws in v) for k, v in groups.items()}
+        limit_bytes = {k: sum(ws.memory_limit for ws in v)
+                       for k, v in groups.items()}
         group_bytes = {k: sum(ws.nbytes for ws in v) for k, v in groups.items()}
 
         limit = sum(limit_bytes.values())
@@ -7312,7 +7379,8 @@ class Scheduler(SchedulerState, ServerNode):
                 logger.info("Retire worker names %s", names)
                 # Support cases where names are passed through a CLI and become strings
                 names_set = {str(name) for name in names}
-                wss = {ws for ws in self.workers.values() if str(ws.name) in names_set}
+                wss = {ws for ws in self.workers.values() if str(ws.name)
+                       in names_set}
             elif workers is not None:
                 logger.info("Retire worker addresses %s", workers)
                 wss = {
@@ -7328,7 +7396,8 @@ class Scheduler(SchedulerState, ServerNode):
                 return {}
 
             stop_amm = False
-            amm: ActiveMemoryManagerExtension | None = self.extensions.get("amm")
+            amm: ActiveMemoryManagerExtension | None = self.extensions.get(
+                "amm")
             if not amm or not amm.running:
                 amm = ActiveMemoryManagerExtension(
                     self, policies=set(), register=False, start=True, interval=2.0
@@ -7338,7 +7407,8 @@ class Scheduler(SchedulerState, ServerNode):
             try:
                 coros = []
                 for ws in wss:
-                    logger.info(f"Retiring worker {ws.address!r} ({stimulus_id=!r})")
+                    logger.info(
+                        f"Retiring worker {ws.address!r} ({stimulus_id=!r})")
 
                     policy = RetireWorker(ws.address)
                     amm.add_policy(policy)
@@ -7496,7 +7566,8 @@ class Scheduler(SchedulerState, ServerNode):
         client: str | None = None,
     ) -> None:
         """Learn that new data has entered the network from an external source"""
-        who_has = {k: [self.coerce_address(vv) for vv in v] for k, v in who_has.items()}
+        who_has = {k: [self.coerce_address(vv) for vv in v]
+                   for k, v in who_has.items()}
         logger.debug("Update data %s", who_has)
 
         for key, workers in who_has.items():
@@ -7511,7 +7582,8 @@ class Scheduler(SchedulerState, ServerNode):
             for w in workers:
                 ws = self.workers[w]
                 self.add_replica(ts, ws)
-            self.report({"op": "key-in-memory", "key": key, "workers": list(workers)})
+            self.report({"op": "key-in-memory", "key": key,
+                        "workers": list(workers)})
 
         if client:
             self.client_desires_keys(keys=list(who_has), client=client)
@@ -7746,7 +7818,8 @@ class Scheduler(SchedulerState, ServerNode):
         if keys is not None:
             result = {k: self.tasks[k].nbytes for k in keys}
         else:
-            result = {k: ts.nbytes for k, ts in self.tasks.items() if ts.nbytes >= 0}
+            result = {k: ts.nbytes for k, ts in self.tasks.items()
+                      if ts.nbytes >= 0}
 
         if summary:
             out: defaultdict[Key, int] = defaultdict(int)
@@ -7923,7 +7996,8 @@ class Scheduler(SchedulerState, ServerNode):
         self.nanny_plugins[name] = plugin
         async with self._starting_nannies_cond:
             if self._starting_nannies:
-                logger.info("Waiting for Nannies to start %s", self._starting_nannies)
+                logger.info("Waiting for Nannies to start %s",
+                            self._starting_nannies)
             await self._starting_nannies_cond.wait_for(
                 lambda: not self._starting_nannies
             )
@@ -7983,7 +8057,8 @@ class Scheduler(SchedulerState, ServerNode):
         """
         client_msgs: Msgs = {}
         worker_msgs: Msgs = {}
-        self._transitions(recommendations, client_msgs, worker_msgs, stimulus_id)
+        self._transitions(recommendations, client_msgs,
+                          worker_msgs, stimulus_id)
         self.send_all(client_msgs, worker_msgs)
 
     async def get_story(self, keys_or_stimuli: Iterable[Key | str]) -> list[Transition]:
@@ -8058,7 +8133,8 @@ class Scheduler(SchedulerState, ServerNode):
         if isinstance(addr, tuple):
             addr = unparse_host_port(*addr)
         if not isinstance(addr, str):
-            raise TypeError(f"addresses should be strings or tuples, got {addr!r}")
+            raise TypeError(
+                f"addresses should be strings or tuples, got {addr!r}")
 
         if resolve:
             addr = resolve_address(addr)
@@ -8082,7 +8158,8 @@ class Scheduler(SchedulerState, ServerNode):
             if ":" in w:
                 out.add(w)
             else:
-                out.update({ww for ww in self.workers if w in ww})  # TODO: quadratic
+                # TODO: quadratic
+                out.update({ww for ww in self.workers if w in ww})
         return list(out)
 
     async def get_profile(
@@ -8106,7 +8183,8 @@ class Scheduler(SchedulerState, ServerNode):
 
         results = await asyncio.gather(
             *(
-                self.rpc(w).profile(start=start, stop=stop, key=key, server=server)
+                self.rpc(w).profile(
+                    start=start, stop=stop, key=key, server=server)
                 for w in workers
             ),
             return_exceptions=True,
@@ -8137,7 +8215,8 @@ class Scheduler(SchedulerState, ServerNode):
         else:
             workers = set(self.workers) & set(workers)
         results: Sequence[Any] = await asyncio.gather(
-            *(self.rpc(w).profile_metadata(start=start, stop=stop) for w in workers),
+            *(self.rpc(w).profile_metadata(start=start, stop=stop)
+              for w in workers),
             return_exceptions=True,
         )
 
@@ -8187,7 +8266,8 @@ class Scheduler(SchedulerState, ServerNode):
 
         def profile_to_figure(state):
             data = profile.plot_data(state)
-            figure, source = profile.plot_figure(data, sizing_mode="stretch_both")
+            figure, source = profile.plot_figure(
+                data, sizing_mode="stretch_both")
             return figure
 
         compute, scheduler, workers = map(
@@ -8226,7 +8306,8 @@ class Scheduler(SchedulerState, ServerNode):
         # System monitor
         from distributed.dashboard.components.shared import SystemMonitor
 
-        sysmon = SystemMonitor(self, last_count=last_count, sizing_mode="stretch_both")
+        sysmon = SystemMonitor(self, last_count=last_count,
+                               sizing_mode="stretch_both")
         sysmon.update()
 
         # Scheduler logs
@@ -8276,7 +8357,8 @@ class Scheduler(SchedulerState, ServerNode):
             address=self.address,
             nworkers=len(self.workers),
             threads=sum(ws.nthreads for ws in self.workers.values()),
-            memory=format_bytes(sum(ws.memory_limit for ws in self.workers.values())),
+            memory=format_bytes(
+                sum(ws.memory_limit for ws in self.workers.values())),
             code=code,
             dask_version=dask.__version__,
             distributed_version=distributed.__version__,
@@ -8285,7 +8367,8 @@ class Scheduler(SchedulerState, ServerNode):
 
         html = TabPanel(child=html, title="Summary")
         compute = TabPanel(child=compute, title="Worker Profile (compute)")
-        workers = TabPanel(child=workers, title="Worker Profile (administrative)")
+        workers = TabPanel(
+            child=workers, title="Worker Profile (administrative)")
         scheduler = TabPanel(
             child=scheduler, title="Scheduler Profile (administrative)"
         )
@@ -8320,11 +8403,13 @@ class Scheduler(SchedulerState, ServerNode):
         with tmpfile(extension=".html") as fn:
             output_file(filename=fn, title="Dask Performance Report", mode=mode)
             template_directory = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "dashboard", "templates"
+                os.path.dirname(os.path.abspath(__file__)
+                                ), "dashboard", "templates"
             )
             template_environment = get_env()
             template_environment.loader.searchpath.append(template_directory)
-            template = template_environment.get_template("performance_report.html")
+            template = template_environment.get_template(
+                "performance_report.html")
             save(tabs, filename=fn, template=template)
 
             with open(fn) as f:
@@ -8396,7 +8481,8 @@ class Scheduler(SchedulerState, ServerNode):
             starts = {}
         results = await asyncio.gather(
             *(
-                self.rpc(w).get_monitor_info(recent=recent, start=starts.get(w, 0))
+                self.rpc(w).get_monitor_info(
+                    recent=recent, start=starts.get(w, 0))
                 for w in self.workers
             )
         )
@@ -8521,7 +8607,8 @@ class Scheduler(SchedulerState, ServerNode):
         distributed.deploy.Adaptive
         """
         if target_duration is None:
-            target_duration = dask.config.get("distributed.adaptive.target-duration")
+            target_duration = dask.config.get(
+                "distributed.adaptive.target-duration")
         target_duration = parse_timedelta(target_duration)
 
         # CPU
@@ -8537,7 +8624,8 @@ class Scheduler(SchedulerState, ServerNode):
         if tasks_ready > 100:
             queued_occupancy *= tasks_ready / 100
 
-        cpu = math.ceil((self.total_occupancy + queued_occupancy) / target_duration)
+        cpu = math.ceil(
+            (self.total_occupancy + queued_occupancy) / target_duration)
 
         # Avoid a few long tasks from asking for many cores
         for ws in self.workers.values():
@@ -8679,7 +8767,8 @@ def decide_worker(
     if ts.actor:
         candidates = all_workers.copy()
     else:
-        candidates = {wws for dts in ts.dependencies for wws in dts.who_has or ()}
+        candidates = {
+            wws for dts in ts.dependencies for wws in dts.who_has or ()}
         candidates &= all_workers
     if valid_workers is None:
         if not candidates:
@@ -8719,7 +8808,8 @@ def validate_task_state(ts: TaskState) -> None:
 
     for dts in ts.waiting_on or ():
         assert not dts.who_has, ("waiting on in-memory dep", str(ts), str(dts))
-        assert dts.state != "released", ("waiting on released dep", str(ts), str(dts))
+        assert dts.state != "released", ("waiting on released dep", str(
+            ts), str(dts))
     for dts in ts.dependencies:
         assert ts in dts.dependents, (
             "not in dependency's dependents",
@@ -8751,7 +8841,8 @@ def validate_task_state(ts: TaskState) -> None:
         assert dts.state != "forgotten"
 
     assert (ts.processing_on is not None) == (ts.state == "processing")
-    assert bool(ts.who_has) == (ts.state == "memory"), (ts, ts.who_has, ts.state)
+    assert bool(ts.who_has) == (
+        ts.state == "memory"), (ts, ts.who_has, ts.state)
 
     if ts.state == "queued":
         assert not ts.processing_on

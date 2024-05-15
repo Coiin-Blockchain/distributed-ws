@@ -65,6 +65,7 @@ from distributed.collections import LRU
 from distributed.comm import Comm, connect, get_address_host, parse_address
 from distributed.comm import resolve_address as comm_resolve_address
 from distributed.comm.addressing import address_from_user_args
+from distributed.comm.core import CommClosedError
 from distributed.compatibility import PeriodicCallback
 from distributed.core import (
     ConnectionPool,
@@ -680,9 +681,9 @@ class Worker(BaseWorker, ServerNode):
         self.low_level_profiler = low_level_profiler
 
         handlers = {
+            "gather": self.gather,
             "run": self.run,
             "run_coroutine": self.run_coroutine,
-            "get_data": self.get_data,
             "update_data": self.update_data,
             "free_keys": self._handle_remote_stimulus(FreeKeysEvent),
             "terminate": self.close,
@@ -706,7 +707,7 @@ class Worker(BaseWorker, ServerNode):
         }
 
         stream_handlers = {
-            "gather": self.gather,
+            "get_data": self.get_data,
             "close": self.close,
             "cancel-compute": self._handle_remote_stimulus(CancelComputeEvent),
             "acquire-replicas": self._handle_remote_stimulus(AcquireReplicasEvent),
@@ -1747,42 +1748,9 @@ class Worker(BaseWorker, ServerNode):
     @context_meter_to_server_digest("get-data")
     async def get_data(
         self,
-        comm: Comm,
         keys: Collection[str],
         who: str | None = None,
-        serializers: list[str] | None = None,
-    ) -> GetDataBusy | Literal[Status.dont_reply]:
-        max_connections = self.transfer_outgoing_count_limit
-        # Allow same-host connections more liberally
-        if get_address_host(comm.peer_address) == get_address_host(self.address):
-            max_connections = max_connections * 2
-
-        if self.status == Status.paused:
-            max_connections = 1
-            throttle_msg = (
-                " Throttling outgoing data transfers because worker is paused."
-            )
-        else:
-            throttle_msg = ""
-
-        if (
-            max_connections is not False
-            and self.transfer_outgoing_count >= max_connections
-        ):
-            logger.debug(
-                "Worker %s has too many open connections to respond to data request "
-                "from %s (%d/%d).%s",
-                self.address,
-                who,
-                self.transfer_outgoing_count,
-                max_connections,
-                throttle_msg,
-            )
-            return {"status": "busy"}
-
-        self.transfer_outgoing_count += 1
-        self.transfer_outgoing_count_total += 1
-
+    ) -> None:
         # This may potentially take many seconds if it involves unspilling
         data = {k: self.data[k] for k in keys if k in self.data}
 
@@ -1795,8 +1763,8 @@ class Worker(BaseWorker, ServerNode):
                         type(self.state.actors[k]), self.address, k, worker=self
                     )
 
-        msg = {"status": "OK", "data": {
-            k: to_serialize(v) for k, v in data.items()}}
+        msg = {"op": "send_data", "data": {
+            k: v for k, v in data.items()}}
         # Note: `if k in self.data` above guarantees that
         # k is in self.state.tasks too and that nbytes is non-None
         bytes_per_task = {k: self.state.tasks[k].nbytes or 0 for k in data}
@@ -1805,40 +1773,14 @@ class Worker(BaseWorker, ServerNode):
         self.transfer_outgoing_bytes_total += total_bytes
 
         try:
-            with context_meter.meter("network", func=time) as m:
-                compressed = await comm.write(msg, serializers=serializers)
-                response = await comm.read(deserializers=serializers)
-            assert response == "OK", response
-        except OSError:
+            self.batched_send(msg)
+        except CommClosedError:
             logger.exception(
-                "failed during get data with %s -> %s",
+                "Connection %s -> %s is already closed",
                 self.address,
                 who,
             )
-            comm.abort()
             raise
-        finally:
-            self.transfer_outgoing_bytes -= total_bytes
-            self.transfer_outgoing_count -= 1
-
-        # Not the same as m.delta, which doesn't include time spent
-        # serializing/deserializing
-        duration = max(0.001, m.stop - m.start)
-        self.transfer_outgoing_log.append(
-            {
-                "start": m.start + self.scheduler_delay,
-                "stop": m.stop + self.scheduler_delay,
-                "middle": (m.start + m.stop) / 2,
-                "duration": duration,
-                "who": who,
-                "keys": bytes_per_task,
-                "total": total_bytes,
-                "compressed": compressed,
-                "bandwidth": total_bytes / duration,
-            }
-        )
-
-        return Status.dont_reply
 
     ###################
     # Local Execution #

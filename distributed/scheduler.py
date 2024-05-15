@@ -17,6 +17,7 @@ import textwrap
 import uuid
 import warnings
 import weakref
+from typing import Dict
 from collections import defaultdict, deque
 from collections.abc import (
     Callable,
@@ -129,7 +130,6 @@ from distributed.utils import (
     wait_for,
 )
 from distributed.utils_comm import (
-    gather_from_workers,
     retry_operation,
     scatter_to_workers,
     unpack_remotedata,
@@ -193,6 +193,8 @@ DEFAULT_EXTENSIONS = {
     "spans": SpansSchedulerExtension,
     "stealing": WorkStealing,
 }
+
+MAX_ASYNC_QUEUE_SIZE: int = 1000
 
 
 class ClientState:
@@ -3796,6 +3798,7 @@ class Scheduler(SchedulerState, ServerNode):
             "log-event": self.log_worker_event,
             "worker-status-change": self.handle_worker_status_change,
             "request-refresh-who-has": self.handle_request_refresh_who_has,
+            "send_data": self.handle_worker_send_data,
         }
 
         client_handlers = {
@@ -3920,6 +3923,9 @@ class Scheduler(SchedulerState, ServerNode):
         setproctitle("dask scheduler [not started]")
         Scheduler._instances.add(self)
         self.rpc.allow_offload = False
+        self.async_queues: Dict[str, asyncio.Queue] = {
+            "get_data": asyncio.Queue(MAX_ASYNC_QUEUE_SIZE)
+        }
 
     ##################
     # Administration #
@@ -5987,6 +5993,10 @@ class Scheduler(SchedulerState, ServerNode):
                     worker, stimulus_id=f"handle-worker-cleanup-{time()}"
                 )
 
+    async def handle_worker_send_data(self, worker: str, data: Dict[str, Any]) -> None:
+        dataDict = {"data": data}
+        await self.async_queues["get_data"].put(dataDict)
+
     def add_plugin(
         self,
         plugin: SchedulerPlugin,
@@ -6220,8 +6230,8 @@ class Scheduler(SchedulerState, ServerNode):
                 missing_keys,
                 new_failed_keys,
                 new_missing_workers,
-            ) = await gather_from_workers(
-                who_has, rpc=self.rpc, serializers=serializers
+            ) = await self.gather_from_workers(
+                who_has, serializers=serializers
             )
             data.update(new_data)
             failed_keys += new_failed_keys
@@ -6238,6 +6248,96 @@ class Scheduler(SchedulerState, ServerNode):
         }
         logger.error("Couldn't gather keys: %s", failed_states)
         return {"status": "error", "keys": list(failed_keys)}
+
+    async def gather_from_workers(
+        self,
+        who_has: Mapping[Key, Collection[str]],
+        *,
+        serializers: list[str] | None = None,
+        who: str | None = None,
+    ) -> tuple[dict[Key, object], list[Key], list[Key], list[str]]:
+        """Gather data directly from peers
+
+        Parameters
+        ----------
+        who_has:
+            mapping from keys to worker addresses
+        Returns
+        -------
+        Tuple:
+
+        - Successfully retrieved: ``{key: value, ...}``
+        - Keys that were not available on any worker: ``[key, ...]``
+        - Keys that raised exception; e.g. failed to deserialize: ``[key, ...]``
+        - Workers that failed to respond: ``[address, ...]``
+
+        See Also
+        --------
+        gather
+        _gather
+        Scheduler.get_who_has
+        """
+        to_gather = {k: set(v) for k, v in who_has.items()}
+        data: dict[Key, object] = {}
+        failed_keys: list[Key] = []
+        missing_workers: set[str] = set()
+        busy_workers: set[str] = set()
+
+        while to_gather:
+            d = defaultdict(list)
+            for key, addresses in to_gather.items():
+                addresses -= missing_workers
+                ready_addresses = addresses - busy_workers
+                if ready_addresses:
+                    d[random.choice(list(ready_addresses))].append(key)
+
+            if not d:
+                if busy_workers:
+                    await asyncio.sleep(0.15)
+                    busy_workers.clear()
+                    continue
+
+                return data, list(to_gather), failed_keys, list(missing_workers)
+
+            for address, keys in d.items():
+                self.worker_send(
+                    address,
+                    {
+                        "op": "get_data",
+                        "keys": keys,
+                        "who": who,
+                    },
+                )
+
+            # I'm not sure of how are we going to handle the exceptions here
+            results = [await self.async_queues["get_data"].get() for _, _ in d.items()]
+            for r in results:
+                if isinstance(r, OSError):
+                    missing_workers.add(address)
+                elif isinstance(r, Exception):
+                    # For example, deserialization error
+                    logger.error(
+                        "Unexpected error while collecting tasks %s from %s",
+                        d[address],
+                        address,
+                        exc_info=r,
+                    )
+                    for key in d[address]:
+                        failed_keys.append(key)
+                        del to_gather[key]
+                elif isinstance(r, BaseException):  # pragma: nocover
+                    # for example, asyncio.CancelledError
+                    raise r
+                else:
+                    assert isinstance(r, dict), r
+                    for key in d[address]:
+                        if key in r["data"]:
+                            data[key] = r["data"][key]
+                            del to_gather[key]
+                        else:
+                            to_gather[key].remove(address)
+
+        return data, [], failed_keys, list(missing_workers)
 
     @log_errors
     async def restart(
